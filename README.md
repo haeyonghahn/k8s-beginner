@@ -87,3 +87,68 @@ spec:
 ![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/b83b194d-62e0-410f-b18b-f505371ddd65)
 
 ### ClusterIP
+서비스는 기본적으로 자신의 ClusterIP를 가지고 있다. 그리고 이 서비스를 Pod에 연결을 시켜 놓으면 서비스의 IP를 통해서도 Pod에 접근을 할 수가 있게 된다. Pod에도 똑같이 클러스터 내에서 접근할 수 있는 IP가 있는데 굳이 서비스에 달아서 이걸 통해서 접근을 하지? 라고 생각할 수 있다. Pod라는 존재는 Kubernetes에서 시스템 장애건, 성능 장애건 언제든지 죽을 수가 있다. 그러면서 다시 재생성되도록 설계가 되어있는 오브젝트이다. Pod가 죽을 때 Pod의 IP는 재생성이 되면 변한다. 그렇게 때문에 파드의 IP는 신뢰성이 떨어진다. 그런데 서비스는 사용자가 직접 지우지 않는 한 삭제되거나 재생성되고 그러진 않는다. ClusterIP는 클러스터 내에서만 접근이 가능한 IP이다. Pod에 있는 IP와 특징이 똑같다. 그래서 ClusterIP도 외부에서는 접근할 수 없다. 그리고 Pod를 하나만 연결할 수 있는 건 아니고 여러 개의 Pod를 연결시킬 수가 있는데 여러 개의 Pod를 연결시켰을 때 서비스가 트래픽을 분산해서 Pod에 전달해준다.
+
+```yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-1
+spec:
+  selector:
+    app: pod
+  ports:
+  - port: 9000
+    targetPort: 8080
+  type: ClusterIP
+```
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+  labels:
+    app: pod
+spec:
+  containers:
+  - name: container
+    image: tmkube/app
+    ports:
+    - containerPort: 8080
+```
+
+### NodePort
+NodePort 타입으로 만들어도 서비스에는 기본적으로 ClusterIP가 할당이 돼서 ClusterIP 타입과 같은 기능이 포함되어 있다. 노드 타입만의 큰 특징은 Kubernetes 클러스터에 연결되어 있는 노드한테 똑같은 포트가 할당이 돼서 외부로부터 어느 노드건간에 그 IP의 포트로 접속을 하면 서비스에 연결이 된다. 그럼 또 서비스는 기본 역할인 자신한테 연결되어 있는 하드의 트래픽을 전달해준다. 주의할 점은 Pod가 있는 Node에만 포트가 할당되는 것이 아니라 모든 Node에 Port가 만들어진다는 게 특징이다.
+
+30,000번 대에서 23,767번대 사이에서만 할당을 할 수 있다. 해당 값도 옵션이기 때문에 옵션을 적용하지 않으면 자동으로 이 범위 내에서 할당이 된다. 그리고 각 Node에 Pod가 하나씩 올라가 있다. 이 상태에서 1번 Node의 IP로 접근을 하더라도 Service는 2번 Node에 있는 Pod한테 트래픽을 전달할 수가 있다. Service 입장에서는 어떤 Node한테 온 트래픽인지 상관없이 그냥 자신한테 달려있는 Pod들한테 트래픽을 전달해주기 때문이다. 근데 만약 `externalTrafficPolicy` 옵션 값을 `Local`이라고 주면 특정 NodePort의 IP로 접근을 하는 트래픽은 Service가 해당 Node 위에 올려져 있는 Pod한테만 트래픽을 전달해준다.
+```yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-2
+spec:
+  selector:
+    app: pod
+  ports:
+    - port: 9000
+      targetPort: 8080
+      nodePort: 30000
+  type: NodePort
+```
+
+### Load Balancer
+Load Balancer 타입으로 서비스를 만들면 기본적으로 NodePort의 성격을 그대로 가지고 있다. 그리고 트래픽을 분산시켜주는 역할을 한다. 로그 밸런서에 접근을 하기 위한 외부 접속 IP 주소는 개별적으로 Kubernetes를 설치했을 때 기본적으로 생기지 않는다. 구글 클라우드 플랫폼이나 AWS에서 제공해주는 Kubernetes를 사용할 경우 자체적으로 플러그인이 설치되어 있어서 로그 밸런서 타입으로 서비스를 만들면 알아서 외부에서 접속할 수 있는 IP를 만들어준다.
+
+```yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-3
+spec:
+  selector:
+    app: pod
+  ports:
+  - port: 9000
+    targetPort: 8080
+  type: LoadBalancer
+```
