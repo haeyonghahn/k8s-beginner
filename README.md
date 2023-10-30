@@ -82,3 +82,8 @@ spec:
       limits:
         memory: 3Gi
 ```
+
+## Service
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/b83b194d-62e0-410f-b18b-f505371ddd65)
+
+### ClusterIP
