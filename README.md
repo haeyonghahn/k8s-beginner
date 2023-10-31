@@ -258,3 +258,86 @@ spec:
       - matchExpressions:
         - {key: node, operator: In, values: [node1]}
 ```
+
+## ConfigMap, Secret
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/e422386d-16ee-4679-a15b-0fd784f2e490)
+
+### Env (Literal)
+ 가장 기본적인 형태인 상수를 넣는 방법으로 ConfigMap은 Key와 Value로 고정이 되어 있다. 그래서 필요한 상수들을 정의해 놓으면 Pod를 생성할 때 ConfigMap을 가져와서 컨테이너 안에 환경 변수에 셋팅을 할 수가 있다. 그리고 Secret도 똑같은 역할을 하는데 이름에서 느껴지는 것처럼 보안적인 요소의 값들을 저장하는 용도로 사용된다. 주로 패스워드라든지 인증키를 Secret에 담는다. 그리고 `사용상 ConfigMap과 다른 점은 Value를 넣을 때 Base64 Encoding을 해서 만들어야 된다는 것이다. 이것은 단순히 Secret을 만들 때 규칙이고 Pod로 주입될 때에는 자동으로 decoding이 되서 환경 변수에서는 원래의 값이 보이게 된다.` 그리고 일반적인 오브젝트 값들은 Kubernetes의 DB에 저장이 되는데 Secret은 메모리에 저장이 된다. `ConfigMap의 경우 Key와 Value 목록을 무한히 넣을 수 있는데에 반해 Secret은 1MB까지만 넣을 수 있다.`
+
+```yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-dev
+data:
+  SSH: False
+  User: dev
+```
+```yml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sec-dev
+data:
+  Key: MTIzNA==
+```
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+spec:
+  containers:
+  - name: container
+    image: tmkube/init
+    envFrom:
+    - configMapRef:
+        name: cm-dev
+    - secretRef:
+        name: sec-dev
+```
+
+### Env (File)
+파일을 통으로 ConfigMap에 담을 수가 있는데 이럴 때 파일 이름이 Key가 되고 파일 안의 내용은 Value가 되서 ConfigMap이 만들어진다. 만드는 방법은 파일을 ConfigMap으로 만드는 것은 대시보드에서 지원해주지 않기 때문에 직접 마스터의 콘솔로 들어가서 `kubectl` 명령을 실행한다. 한가지 주의할 점은 Secret의 경우 텍스트 안에 내용이 Base64로 변경이 되기 때문에 만약에 파일 안에 내용이 이미 Base64였다면 두번 인코딩이 되는 셈이기 때문에 유의해야 한다.
+```
+kubectl create configmap cm-file --from-file=./file.txt
+kubectl create secret generic sec-file --from-file=./file.txt
+```
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: file
+spec:
+  containers:
+  - name: container
+    image: tmkube/init
+    env:
+- name: file
+  valueFrom:
+    configMapKeyRef:
+      name: cm-file
+      key: file.txt
+```
+
+### Volume Mount (File)
+파일을 마운팅하는 방법이다. 파일을 ConfigMap에 담는 데까지는 동일하다. Pod를 만들 때 컨테이너 안에 mountPath를 지정하고 Path안에 파일을 마운트할 수 있다. Env (File)과 Volume Mount (File)의 큰 차이점은 만약 Pod를 생성한 다음에 각각의 ConfigMap에 내용을 변경하게 된다면 `환경변수 방식은 한번 주입을 하면 끝이기 때문에 ConfigMap의 데이터가 변경되어도 Pod의 환경변수 값에는 영향이 없다. 반면에 File Mount는 마운트라는 것이 원본과 연결시켜준다는 개념이기 때문에 내용이 변경되면 Pod에 마운팅된 내용도 변하게 된다.` 그렇게 때문에 이러한 특성을 잘 알고 필요한 상황에 따라 활용하면 된다.
+
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mount
+spec:
+  containers:
+  - name: container
+    image: tmkube/init
+    volumeMounts:
+    - name: file-volume
+      mountPath: /mount
+  volumes:
+  - name: file-volume
+    configMap:
+      name: cm-file
+```
