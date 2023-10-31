@@ -152,3 +152,34 @@ spec:
     targetPort: 8080
   type: LoadBalancer
 ```
+
+## Volume
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/05d0c455-5147-4d2e-ad2a-00e162ee79ed)
+
+### emptyDir
+컨테이너들끼리 데이터를 공유하기 위해서 사용하는 것이다. 볼륨이 생성될 때는 항상 볼륨 안에 내용이 비어 있기 때문에 `emptyDir`라고 명칭이 된 것이다. 만약 Container1이 웹 역할을 하는 서버이고 Container2이 백엔드를 처리해주는 서버라고 했을 때 웹 서버로 받은 어떤 특정 파일을 마운트가 된 볼륨에 저장을 해 놓고 백엔드에 있는 컨테이너 역시 볼륨을 마운트해 놓으면 두 서버가 볼륨을 자신의 로컬에 있는 파일처럼 사용을 하기 때문에 두 서버가 서로 파일을 주고 받을 필요 없이 편하게 사용할 수 있다. 그리고 볼륨은 그림에서처럼 Pod 안에 생성이 되기 때문에 Pod에 문제가 발생해서 재생성이 되면 데이터가 싹 없어진다. 그래서 emptyDir 볼륨은 `꼭 일시적인 허용 목적에 의한 데이터만 넣어주는 것이 좋다.`
+
+yml 내용을 보면 Container1은 `mountPath`를 `/mount1`을 사용했고 Container2는 `mountPath`를 `/mount2`를 사용했다. 서로의 Path이름이 다르더라도 결국 각각의 Path가 지정되는 볼륨이 `emptyDir`로 똑같은 볼륨을 지정을 하고 있기 때문에 컨테이너마다 자신이 원하는 경로를 사용하고 있지만 결국 한 볼륨을 마운트하고 있는 것이다.
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-volume-1
+spec:
+  containers:
+  - name: container1
+    image: tmkube/init
+    volumeMounts:
+    - name: empty-dir
+      mountPath: /mount1
+  - name: container2
+    image: tmkube/init
+    volumeMounts:
+    - name: empty-dir
+      mountPath: /mount2
+  volumes:
+  - name : empty-dir
+    emptyDir: {}
+```
+
+### hostPath
