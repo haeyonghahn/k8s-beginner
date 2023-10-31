@@ -343,3 +343,7 @@ spec:
 ```
 
 ## Object - Namespace, ResourceQuota, LimitRange
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/2fa88d56-4033-4d03-a960-faa072968902)
+
+### Namespace
+한 네임스페이스 안에는 같은 타입의 오브젝트들은 이름이 중복될 수 없다는 특징을 가지고 있다. 오브젝트들마다 별도의 UUID가 존재하긴 하지만 네임스페이스 안에서는 같은 종류의 오브젝트라면 이름 또한 UUID 같이 유일한 키 역할을 할 수가 있는 셈이다. 그리고 네임스페이스의 대표적인 특징이 타 네임스페이스에 있는 자원과 분리가 돼서 관리가 된다는 것이다. Namespace-2가 있고 그 안에는 서비스가 존재한다. 위에서 Pod와 Service 간의 연결을 Pod에는 Label을 달고 Service에는 Selector를 달아서 연결을 한다. `그런데 타 네임스페이스에 있는 Pod에는 연결이 되지 않는다.` 이뿐만 아니라 대부분의 자원들은 네임스페이스 안에서만 사용할 수가 있다.
