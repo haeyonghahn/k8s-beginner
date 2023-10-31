@@ -1,5 +1,5 @@
 # k8s-beginner
-## Pod
+## Object - Pod
 ![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/2eaa11d4-5627-4fa7-ad1c-cdf4a2042b97)
 
 ### Container
@@ -83,7 +83,7 @@ spec:
         memory: 3Gi
 ```
 
-## Service
+## Object - Service
 ![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/b83b194d-62e0-410f-b18b-f505371ddd65)
 
 ### ClusterIP
@@ -153,7 +153,7 @@ spec:
   type: LoadBalancer
 ```
 
-## Volume
+## Object - Volume
 ![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/05d0c455-5147-4d2e-ad2a-00e162ee79ed)
 
 ### emptyDir
@@ -259,7 +259,7 @@ spec:
         - {key: node, operator: In, values: [node1]}
 ```
 
-## ConfigMap, Secret
+## Object - ConfigMap, Secret
 ![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/e422386d-16ee-4679-a15b-0fd784f2e490)
 
 ### Env (Literal)
@@ -341,3 +341,5 @@ spec:
     configMap:
       name: cm-file
 ```
+
+## Object - Namespace, ResourceQuota, LimitRange
