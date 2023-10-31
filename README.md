@@ -118,7 +118,7 @@ spec:
 ```
 
 ### NodePort
-NodePort 타입으로 만들어도 서비스에는 기본적으로 ClusterIP가 할당이 돼서 ClusterIP 타입과 같은 기능이 포함되어 있다. 노드 타입만의 큰 특징은 Kubernetes 클러스터에 연결되어 있는 노드한테 똑같은 포트가 할당이 돼서 외부로부터 어느 노드건간에 그 IP의 포트로 접속을 하면 서비스에 연결이 된다. 그럼 또 서비스는 기본 역할인 자신한테 연결되어 있는 하드의 트래픽을 전달해준다. 주의할 점은 Pod가 있는 Node에만 포트가 할당되는 것이 아니라 모든 Node에 Port가 만들어진다는 게 특징이다.
+NodePort 타입으로 만들어도 서비스에는 기본적으로 ClusterIP가 할당이 돼서 ClusterIP 타입과 같은 기능이 포함되어 있다. 노드 타입만의 큰 특징은 Kubernetes 클러스터에 연결되어 있는 노드한테 똑같은 포트가 할당이 돼서 외부로부터 어느 노드건간에 그 IP의 포트로 접속을 하면 서비스에 연결이 된다. 그럼 또 서비스는 기본 역할인 자신한테 연결되어 있는 파드의 트래픽을 전달해준다. 주의할 점은 Pod가 있는 Node에만 포트가 할당되는 것이 아니라 모든 Node에 Port가 만들어진다는 게 특징이다.
 
 30,000번 대에서 23,767번대 사이에서만 할당을 할 수 있다. 해당 값도 옵션이기 때문에 옵션을 적용하지 않으면 자동으로 이 범위 내에서 할당이 된다. 그리고 각 Node에 Pod가 하나씩 올라가 있다. 이 상태에서 1번 Node의 IP로 접근을 하더라도 Service는 2번 Node에 있는 Pod한테 트래픽을 전달할 수가 있다. Service 입장에서는 어떤 Node한테 온 트래픽인지 상관없이 그냥 자신한테 달려있는 Pod들한테 트래픽을 전달해주기 때문이다. 근데 만약 `externalTrafficPolicy` 옵션 값을 `Local`이라고 주면 특정 NodePort의 IP로 접근을 하는 트래픽은 Service가 해당 Node 위에 올려져 있는 Pod한테만 트래픽을 전달해준다.
 ```yml
@@ -183,3 +183,78 @@ spec:
 ```
 
 ### hostPath
+이름 그대로 한 호스트. Pod들이 올라가 있는 노드의 Path를 볼륨으로 사용하는 것이다. emptyDir와 다른 점은 Path를 각각의 Pod들이 마운트해서 공유하기 때문에 Pod들이 죽어도 노드에 있는 데이터는 사라지지 않는다. 이러한 점에서 좋아 보일 수 있지만 Pod 입장에서는 문제가 있다. 만약 Pod2가 죽어서 재생성이 될 때 꼭 해당 노드에 재생성이되리라는 보장은 없다. 만약 재생성이되는 순간 스케줄러가 자원 상황을 보고 Node2에 Pod를 만들어 줄 수도 있다. 또는 Node1에 장애가 생겨서 다른 Node에 Pod가 옮겨질 수도 있다. 그래서 Pod가 다른 노드로 옮겨졌을 때 원래 있었던 Node에 있는 볼륨을 마운트할 수 없게 된다. 굳이 방법을 찾는다면 Node가 추가될 때마다 똑같은 이름의 경로를 만들어서 직접 노드에 있는 Path끼리 마운트를 시켜주면 되지만 이것은 Kubernetes가 해주는 역할은 아니고 운영자가 직접 노드에 추가될 때마다 리눅스 시스템 별도의 마운트 기술을 사용해서 연결해주어야 한다. 이러한 개입은 실수를 발생할 여지가 있기 때문에 추천하진 않는다. hostPath가 사용되는 용도는 기본적으로 각 노드마다 노드 자신을 위해서 사용되는 파일들이 있을 것이다. 시스템 파일이나 여러 설정 파일이 있는데 Pod 자신이 할당되어 있는 호스트의 데이터를 읽거나 써야할 때 사용하면 된다.
+
+한 가지 주의할 점은 hostPath는 Pod가 만들어지기 전에 사전에 만들어져 있어야 에러가 발생하지 않는다. 다시 한 번 더 말하자면 hostPath는 Pod의 데이터를 저장하기 위한 용도가 아니라 Node에 있는 데이터를 Pod에 쓰기 위한 용도이다.
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-volume-2
+spec:
+  containers:
+  - name: container
+    image: tmkube/init
+    volumeMounts:
+    - name: host-path
+      mountPath: /mount1
+  volumes:
+  - name : host-path
+    hostPath:
+      path: /node-v
+      type: Directory
+```
+
+### PVC / PV
+Pod에 영속성 있는 볼륨을 제공하기 위한 개념이다. 로컬 볼륨이 있지만 외부의 원격으로 사용되는 형태의 볼륨도 있다. 그림처럼 아마존이나 Git에 연결할 수도 있고 NFS를 써서 다른 서버와 연결할 수도 있다. 그리고 스토리지 OS 같이 볼륨을 직접 만들고 관리할 수 있는 솔루션도 있다. 이러한 것들을 Persistent Volume을 정리하고 연결한다. 그런데 Pod는 PV(Persistent Volume)에 바로 연결하지 않고 Persistent Volume Claim을 통해서 PV와 연결이 된다. 바로 Pod에 PV로 연결하는 것이 더 깔끔해 보일 수가 있지만 중간에 PVC를 두는 것은 Kubernetes는 볼륨 사용에 있어 User 영역과 Admin 영역을 나눠서 Admin은 Kubernetes를 담당하는 운영자일 것이고 User는 Pod의 서비스를 만들고 배포를 관리하는 서비스를 만드는 담당자일 것이다. 그래서 전문적으로 관리하는 운영자가 PV를 만들어 놓으면 User가 PVC를 만들어서 사용하게끔 하는 것이다.
+
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-volume-3
+spec:
+  containers:
+  - name: container
+    image: tmkube/init
+    volumeMounts:
+    - name: pvc-pv
+      mountPath: /volume
+  volumes:
+  - name : pvc-pv
+    persistentVolumeClaim:
+      claimName: pvc-01
+```
+Persistent Volume Claim을 만들기 위한 yml 파일을 보면 읽기 쓰기 모드가 되면서 용량이 1G인 볼륨을 할당해달라고 요청하는 것이다. `storageClassName`은 쌍따움표("")로 작성하면 현재 만들어져 있는 PVC들 중에서 선택이 된다. 쌍따움표("")를 안 넣고 생략을 하면 다른 동작으로 사용될 수 있기 때문에 storageClassName은 다음 과정에서 더 배워보자.  
+```yml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-01
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1G
+  storageClassName: ""
+```
+Persistent Volume은 hostPath처럼 localPath를 사용하는 것이고 PV에 연결되는 Pod들은 Node1이라고 라벨링이 되어있는 Node 위에만 무조건 만들어진다는 뜻이다. `capacity`와 `accessModes`를 지정해두면 PVC에서 PV를 Kubernetes가 자동으로 연결해줄 때 어떠한 근거가 필요한데 `capacity`와 `accessMode`를 보고 Kubernetes가 연결해 준다.
+```yml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-01
+spec:
+  capacity:
+    storage: 1G
+  accessModes:
+    - ReadWriteOnce
+  local:
+    path: /node-v
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - {key: node, operator: In, values: [node1]}
+```
