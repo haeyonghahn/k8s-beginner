@@ -440,3 +440,74 @@ spec:
     maxLimitRequestRatio:
       memory: 3
 ```
+
+## Controller
+- Auto Healing : Node 위에 있는 Pod가 있을 때 해당 Pod가 갑자기 다운된다거나 Pod가 스케줄링되어 있는 Node가 갑자기 다운되면 해당 Pod에서 돌아가고 있는 서비스에 장애가 발생한다. 이것을 Controller가 즉각적으로 인지하고 Pod를 다른 Node에 새로 만들어준다. 이것을 `Auto Healing` 기능이라고 한다.
+- Auto Scaling : Pod의 리소스가 limit 상태가 되었을 때 Controller는 해당 상태를 파악하고 Pod를 하나 더 만들어 줌으로써 부하를 분산시키고 Pod가 죽지 않도록 해준다. 이것을 `Auto Scaling` 기능이라고 한다.
+- Software Update : 여러 Pod에 대한 버전을 업그레이드 해야 될 경우 Controller를 통해서 한번에 쉽게 할 수 있고 업그레이드 도중에 문제가 생기면 롤백을 할 수 있는 기능을 제공한다.
+- Job : 일시적은 작업을 해야 될 경우 Controller가 필요한 순간에 Pod를 만들어서 해당 작업을 이행하고 삭제시킬 수 있다. 이렇게 되면 그 순간에만 자원이 사용되고 작업 후에 다시 반환되기 때문에 효율적인 자원 활용이 가능해진다.
+
+## Controller - Replication Controller, ReplicaSet
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/ee0bc109-f333-4f05-b03f-38b8c83f707d)
+
+Replication Controller는 Deprecated된 오브젝트이다. 이걸 대체로 ReplicaSet이 있다. 아래의 `Template`과 `Replicas`는 두 오브젝트의 공통된 기능이고 `Selector`는 ReplicaSet에만 좀 더 확장된 기능을 가지고 있다. 
+
+### Template
+Controller와 Pod는 Service와 Pod처럼 selector로 연결이 된다. 그래서 Label이 붙어 있는 Pod가 있고 selector와 매핑되는 controller를 만들면 연결이 된다. 그리고 controller를 만들 때 template으로 pod의 내용을 넣게 되는데 Controller는 Pod가 죽으면 재생성시키기 때문에 Pod가 다운되면 template으로 Pod를 새로 만들어주게 된다. 이러한 특성을 사용해서 앱에 대한 업그레이드를 할 수 있는데 template v2에 대한 Pod를 업데이트하고 기존에 연결되어 있는 Pod를 다운시키면 Controller는 template을 가지고 Pod를 재생성하면서 버전 업그레이드를 할 수 있다. 
+
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+  labels:
+    type: web
+spec:
+  containers:
+  - name: container
+    image:
+      tmkube/app:v1
+```
+```yml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: replication-1
+spec:
+  replicas: 1
+  selector:
+    type: web
+  template:
+    metadata:
+      name: pod-1
+      labels:
+        type: web
+    spec:
+      containers:
+      - name: container
+        image: tmkube/app:v2
+```
+
+### Replicas
+그림에 나와있는 replicas 숫자만큼 Pod의 개수가 관리가 된다. Pod가 삭제되면 하나의 Pod만 재생성해준다. 그런데 만약에 해당 수치를 3으로 늘리게 되면 그 수만큼 Pod가 늘어나면서 Scale-out이 되는 것이다. 마찬가지로 Pod들을 모두 삭제하면 Controller는 replicas에 대한 개수만큼 3개의 Pod를 다시 만들어준다. 위의 yml 파일의 내용을 보면 replicas 개수를 늘려주게 되면 scale-out이 되는 것이고 반대로 수치를 내리면 scale-in이 되는 것이다. 그리고 template 기능과 replicas 기능을 통해서 Pod와 Controller를 따로 만들지 않고 한 번에 만들 수 있는데 위의 yml 파일처럼 내용을 담아서 Pod없이 Controller를 만들면 Controller는 replicas가 2로 되어 있는 부분은 현재 Pod가 없기 때문에 template에 있는 Pod의 내용을 가지고 2개의 Pod를 만든다. 실제로 Controller를 사용할 때 이렇게 Controller에 대한 내용만 만들어서 사용한다.
+
+### Selector
+Replication Controller의 selector에는 key와 value가 같은 label의 Pod들과 연결을 해준다. 반면 ReplicaSet은 selector에 두 가지 추가적인 속성이 있는데 하나는 matchLabels라고 해서 Replication Controller와 동일하게 key와 value의 label이 같은 Pod들만 연결을 해준다. key와 value 중에 하나라도 다르면 연결을 하지 않는다. 그리고 다른 하나는 `matchExpressions`라는 속성이 있는데 value를 좀 더 디테일하게 컨트롤할 수 있다.
+
+```yml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: replica-1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      type: web
+    matchExpressions:
+    - {key: ver, operator: Exists}
+template:
+  metadata:
+    name: pod
+...
+```
