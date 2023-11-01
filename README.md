@@ -511,3 +511,84 @@ template:
     name: pod
 ...
 ```
+
+## Controller - Deployment
+Deployment는 현재 서비스가 운영 중인데 서비스를 업데이트해야 돼서 재배포를 해야될 때 도움을 주는 Controller이다.
+
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/dff8d152-5665-48e9-8f0b-04e6787c3a7f)
+
+### ReCreate
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/d1e51bc9-1077-4270-a832-7f3866ae1005)
+
+Deployment를 만들 때 replica에서 넣었던 selector와 replicas 그리고 template을 똑같이 넣게 된다. 하지만 이 값들은 직접 Deployment가 Pod를 만들어서 관리를 하기 위한 것은 아니고 ReplicaSet을 만들고 여기에 값들을 지정하기 위한 용도로 사용된다. 그래서 만들어진 ReplicaSet은 Pod를 만들게 된다. 그리고 Service를 만들어서 Service에 붙어있는 Label에 연결하면 Service를 통해서 Pod에 접근할 수 있게 된다. 본격적으로 ReCreate 업그레이드를 하려면 template을 v2 버전으로 업데이트해주면 되는데 그러면 Deployment는 먼저 ReplicaSet에 replicas를 0으로 변경한다. 그럼 ReplicaSet은 Pod들을 제거하고 서비스도 연결 대상이 없어지기 때문에 다운타임이 발생한다. 그리고 새로운 ReplicaSet을 만드는데 template에는 변경된 v2의 Pod를 넣기 때문에 Pod들도 v2버전으로 생성이 된다. Service에는 Label이 있어서 자동적으로 Pod들에 연결이 된다. 그럼 ReCreate 배포는 끝나게 된다. 
+
+```yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-1
+spec:
+  selector:
+    type: app
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+```
+yml 파일의 내용을 보면 배포 방식을 정할 수가 있는데 Strategy 타입에 ReCreate라고 지정한다. `revisionHistoryLimit`는 새로운 ReplicaSet을 만들었지만 기존에 있는 ReplicaSet은 지우지 않았다. 만약 이 상태에서 새로운 버전으로 업그레이드를 하게 되면 ReplicaSet도 지워지지 않고 남아있게 되고 새로운 ReplicaSet이 만들어지게 된다. 근데 1이라고 지정하면 이 상태에서 새로 업그리에드할 때 새로운 ReplicaSet이 생기면서 0이 되고 해당 ReplicaSet은 삭제된다. 그러니까 0인 ReplicaSet을 하나만 남기겠다는 의미이다. 
+```yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-1
+spec:
+  selector:
+    matchLabels:
+      type: app
+  replicas: 2
+  strategy:
+    type: Recreate
+  revisionHistoryLimit: 1
+```
+
+### Rolling Update (default)
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/63293439-5918-45e4-be7b-dcec5635c438)
+
+새로운 버전으로 템플릿을 교체하게 되면서 Rolling Update가 시작되는데 먼저 ReplicaSet을 하나 만들고 해당 상태에서는 ReplicaSet이 하나이기 때문에 Pod가 하나 만들어지면서 v1 라벨과 똑같은 라벨(v2)이 만들어지니까 Service는 연결이 된다. 그래서 이제 Service에 연결을 하면 v1과 v2의 트래픽이 분산되서 보내지게 된다. 그런 다음에 기존에 있던 replicas를 1로 변경이 되면서 Pod가 하나 줄어들고 삭제가 완료되면 v2의 replicas를 2로 만들어서 하나를 더 늘리고 마지막으로 v1을 0으로 만들면서 남은 Pod들도 모두 없애준다. 이것도 마찬가지로 ReplicaSet을 지우지는 않고 배포를 종료하게 된다. 
+
+```yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-2
+spec:
+  selector:
+    type: app
+  ports:
+  - port: 8080
+    protocol: TCP
+    targetPort: 8080
+```
+yml 파일의 내용을 보면 strategy type에 RollingUpdate라고 명시가 되어 있고 `minReadySeconds`라고 해서 10으로 해놓았는데 해당 값없이 업데이트를 하게 되면 v1과 v2의 Pod들이 추가되고 삭제되는 게 순식간에 진행이 된다. 근데 이렇게 값을 지정하게 되면 10초라는 텀을 갖고 진행을 하게 된다.
+```yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-2
+spec:
+  selector:
+    matchLabels:
+      type: app
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  minReadySeconds: 10
+  template:
+    metadata:
+      labels:
+        type: app
+    spec:
+      containers:
+      - name: container
+        image: tmkube/app:v1
+```
