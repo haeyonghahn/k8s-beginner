@@ -1,4 +1,6 @@
 # k8s-beginner
+해당 문서 출처는 [대세는 쿠버네티스 [초급~중급]](https://www.inflearn.com/course/%EC%BF%A0%EB%B2%84%EB%84%A4%ED%8B%B0%EC%8A%A4-%EA%B8%B0%EC%B4%88/dashboard) 기반으로 작성되었습니다. 
+
 ## Object - Pod
 ![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/2eaa11d4-5627-4fa7-ad1c-cdf4a2042b97)
 
