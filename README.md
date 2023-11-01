@@ -592,3 +592,83 @@ spec:
       - name: container
         image: tmkube/app:v1
 ```
+
+## Controller - DeamonSet, Job, CronJob
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/f878ad82-cf3e-42ff-ab49-0bee25ef0c69)
+
+__DeamonSet__   
+각각의 Node에 자원이 다르게 남아있는 상태에서 이전에 배운 ReplicaSet의 경우 Pod를 스케줄러에 의존해서 Node에 배치를 할 때 만약 Node1에 자원이 많이 남아있는 상태라면 Pod를 많이 배치를 할 것이다. 그리고 Node3처럼 자원이 별로 없다면 Pod를 배치안할 수도 있다. 반면 DaemonSet은 노드의 자원 상태랑 상관없이 모든 Node에 Pod가 하나씩 생긴다는 특징이 있다. 만약 Node가 10개면 각각의 Node에 하나씩 총 10개의 Pod가 생기는 것이다. 이렇게 각각의 Node마다 설치를 해서 사용해야 되는 서비스들이 있다. 대표적으로 첫째, 성능수집인데 각 Node들의 성능상태는 모두 감시 대상이다. 그래서 모니터링 화면이 있을 것이고 각각의 노드에 Prometheus 같은 성능 수집 에이전트가 깔려 있어야 모든 노드들의 정보들을 모니터링 시스템에 전달해 줄 수가 있다. 둘째, 로그 수집이다. 특정 노드에 장애가 발생했을 경우 문제를 파악하려면 로그를 봐야 한다. 이렇게 Fluentd와 같은 서비스는 각각의 노드에 설치돼서 로그 정보를 수집한다. 마지막으로 노드들을 스토리지에 활용할 수가 있는데 GlusterFS처럼 각각의 노드에 설치돼서 해당 자원을 가지고 네트워크 파일 시스템을 구축할 수가 있다. 그리고 Kubernetes 자체도 네트워킹 관리를 하기 위해서 각각의 노드에 DeamonSet으로 프록시 역할을 하는 Pod를 만든다. 
+
+__Job, CronJob__   
+ReplicaSet에 의해 만들어진 Pod가 있고 Job을 통해서 만들어진 Pod가 있다. 같은 Pod들이지만 누구에 의해서 만들어졌냐에 따라서 달라지는 부분들이 있다. Pod들이 Node1에서 돌아가고 있는 상태에서 해당 Node가 다운이 됐다. 그리고 직접 만들어진 Pod도 장애가 발생한 것이다. 그렇다면 해당 서비스는 더 이상 유지될 수가 없다. 근데 이렇게 Controller에 의해서 만들어진 Pod들은 Controller에 의해서 장애가 감지가 되면 다른 Node에 재생성되기 때문에 서비스는 계속 유지가 된다. 그리고 이렇게 ReplicaSet에서 만들어진 Pod는 일을 하지 않으면 다시 Pod를 restart시켜주기 때문에 Pod에 있는 서비스는 무슨 일이 있어도 서비스가 유지되어야 하는 목적으로 써야 한다. 잠시 여기서 `Recreate`와 `Restart`에 대한 차이는 Recreate는 Pod를 다시 만들어주기 때문에 Pod의 이름이나 IP들이 변경되고 Restart는 Pod는 그대로 있고 Pod 안에 있는 컨테이너만 재기동시켜 준다는 차이점이 있다. 반면 Job으로 만들어진 Pod는 프로세서가 일을 하지 않으면 Pod는 종료가 된다. 이때 종료의 의미는 Pod가 삭제되는 건 아니고 자원을 사용하지 않는 상태로 멈춰 있다는 것인데 우리가 작업을 걸어 놓고 끝난다고 해서 Pod가 지워지면 결과를 못 본다. 우리는 해당 Pod 안에 들어가서 로그를 확인할 수 있다. 그 이후에 필요가 없으면 직접 삭제를 하면 된다. 이렇게 Pod를 만드는 주체에 따라서 상황별로 Pod의 동작이 틀리기 때문에 잘 알고 사용해야 한다. 그리고 CronJob은 주기적인 시간에 따라서 생성을 하는 역할을 하는데 대체로 CronJob을 하나 단위로는 사용하지 않고 CronJob을 만들어서 특정 시간에 반복적으로 실행할 목적으로 사용이 된다. 
+
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/c378e85d-3bad-4cb6-92dd-d854c2fbfdee)
+
+### DaemonSet
+DaemonSet은 한 노드에 하나를 추가해서 Pod를 만들 수는 없지만 노드에 Pod를 안 만들 순 있다. 그리고 특정 노드로 접근을 했을 때 이 노드에 들어있는 Pod에 접근이 되도록 많이 사용을 하는데, 이전 학습에서 노드 타입의 서비스를 만들고 해당 옵션을 추가하면 특정 노드에 노드 포트로 접근을 하면 트랙픽은 서비스로 가고 서비스가 해당 노드에 Pod로 연결이 되도록 했다. 이렇게 hostPort라고 해서 해당 설정을 지정하면 직접 노드에 있는 포트가 Pod로 연결이 돼서 똑같은 결과를 얻을 수가 있다.
+
+yml 파일을 보면 18080번 포트로 들어온 트래픽은 8080번 컨테이너 포트로 연결이 된다.
+```yml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemonset-1
+spec:
+  selector:
+    matchLabels:
+      type: app
+  template:
+    metadata:
+      labels:
+        type: app
+spec:
+  nodeSelector:
+    os: centos
+  containers:
+  - name: container
+    image: tmkube/app
+    ports:
+    - containerPort: 8080
+      hostPort: 18080
+```
+
+### Job
+하나의 Pod를 생성하고 해당 파드가 일을 다하면 Job도 종료가 되지만 completions라고 해서 값을 6을 주면 6개의 Pod를 하나씩 순차적으로 실행시켜서 모두 작업이 끝나야 Job도 종료가 된다. 그리고 parallelism 옵션은 값을 2를 주면 2개씩 Pod가 생성되고 activeDeadlineSeconds의 값을 30을 주면 30초 후에 기능이 정지해버린다. 그리고 실행되고 있는 모든 Pod는 삭제가 된다. 아직 실행되지 못한 Pod들도 앞으로 실행이 안된다. 이걸 어느 용도로 사용하냐면 만약 10초가 걸릴 일에 Job을 만들었는데 30초가 되도록 작업이 끝나지 않으면 뭔가 문제가 걸렸을 확률이 큰 거고 그럴 경우 Pod들을 삭제해서 자원을 릴리즈하고 더이상 작업을 진행하지 않도록 설정을 할 때 사용을 한다. restartPolicy는 Never가 고정된 값이고 Never와 onfailer만 사용할 수 있다.
+
+```yml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-1
+spec:
+  completions: 6
+  parallelism: 2
+  activeDeadlineSeconds: 30
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: container
+        image: tmkube/init
+```
+
+### CronJob
+CronJob은 jobTemplate이 있어서 해당 내용을 통해 Job을 만들어주고 스케줄이 있어서 해당 시간을 주기로 Job을 만든다. 그림처럼 1분으로 설정을 하면 1분 간격으로 Job이 생성되고 Job 또 자신의 역할인 Pod를 만들게 된다. 그리고 conCurrencyPolicy라는 기능이 있는데 `Allow`, `Forbid`, `Replace` 3가지 옵션이 있다. 일반적으로 policy를 설정하지 않으면 allow가 디폴트 값이다. allow는 1분 간격으로 스케줄한다고 설정을 했을 때 1분이 됐을 때 Job이 만들어지고 Pod가 생성된다. 그리고 2분이 됐을 때 사전에 만들어진 Pod가 Running 중이거나 아니면 종료가 됐던 간에 상관없이 자신의 스케줄 타임이 되면 또 새로운 Job을 만들고 Pod가 생긴다. 마찬가지로 3분이 됐을 때도 Job이 만들어진다. Forbid는 1분이 됐을 때 Job이 생성되지만 2분이 됐을 때까지 Pod가 종료되지 않고 실행이 되고 있으면 이때 2분째 생겨야 되는 Job은 스킵이 되고 Pod가 종료되는 즉시 다음 스케줄 타임에 있는 Job이 만들어진다. Replace는 1분의 Job이 만들어졌고 2분 스케줄이 됐는데 Pod가 계속 Running 중이라면 새로운 Pod를 만들어서 해당 Job 연결을 새로운 Pod로 교체시켜준다. 2분이 됐을 때 새로운 잡은 생기지 않지만 새로운 Pod가 생기면서 이전 스케줄 때 만들었던 Job이 연결이 되는 것이다. 이 Pod가 자신의 스케줄 타임에 종료가 됐다면 3분 스케줄이 됐을 때 새로운 Job이 만들어지고 Pod가 만들어지게 된다.
+
+```yml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-job
+spec:
+  schedule: "* /1 * * * *"
+  concurrencyPolicy: Allow
+  jobTemplate:
+  template:
+    spec:
+      template:
+        restartPolicy: Never
+        containers:
+        - name: container
+          image: tmkube/app
+```
