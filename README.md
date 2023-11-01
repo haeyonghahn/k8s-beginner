@@ -518,7 +518,7 @@ Deployment는 현재 서비스가 운영 중인데 서비스를 업데이트해�
 ![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/dff8d152-5665-48e9-8f0b-04e6787c3a7f)
 
 ### ReCreate
-![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/d1e51bc9-1077-4270-a832-7f3866ae1005)
+![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/ca61392e-f7f0-4a5a-a44f-936b6124aa3f)
 
 Deployment를 만들 때 replica에서 넣었던 selector와 replicas 그리고 template을 똑같이 넣게 된다. 하지만 이 값들은 직접 Deployment가 Pod를 만들어서 관리를 하기 위한 것은 아니고 ReplicaSet을 만들고 여기에 값들을 지정하기 위한 용도로 사용된다. 그래서 만들어진 ReplicaSet은 Pod를 만들게 된다. 그리고 Service를 만들어서 Service에 붙어있는 Label에 연결하면 Service를 통해서 Pod에 접근할 수 있게 된다. 본격적으로 ReCreate 업그레이드를 하려면 template을 v2 버전으로 업데이트해주면 되는데 그러면 Deployment는 먼저 ReplicaSet에 replicas를 0으로 변경한다. 그럼 ReplicaSet은 Pod들을 제거하고 서비스도 연결 대상이 없어지기 때문에 다운타임이 발생한다. 그리고 새로운 ReplicaSet을 만드는데 template에는 변경된 v2의 Pod를 넣기 때문에 Pod들도 v2버전으로 생성이 된다. Service에는 Label이 있어서 자동적으로 Pod들에 연결이 된다. 그럼 ReCreate 배포는 끝나게 된다. 
 
