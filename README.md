@@ -346,4 +346,97 @@ spec:
 ![image](https://github.com/haeyonghahn/k8s-beginner/assets/31242766/2fa88d56-4033-4d03-a960-faa072968902)
 
 ### Namespace
-한 네임스페이스 안에는 같은 타입의 오브젝트들은 이름이 중복될 수 없다는 특징을 가지고 있다. 오브젝트들마다 별도의 UUID가 존재하긴 하지만 네임스페이스 안에서는 같은 종류의 오브젝트라면 이름 또한 UUID 같이 유일한 키 역할을 할 수가 있는 셈이다. 그리고 네임스페이스의 대표적인 특징이 타 네임스페이스에 있는 자원과 분리가 돼서 관리가 된다는 것이다. Namespace-2가 있고 그 안에는 서비스가 존재한다. 위에서 Pod와 Service 간의 연결을 Pod에는 Label을 달고 Service에는 Selector를 달아서 연결을 한다. `그런데 타 네임스페이스에 있는 Pod에는 연결이 되지 않는다.` 이뿐만 아니라 대부분의 자원들은 네임스페이스 안에서만 사용할 수가 있다.
+한 네임스페이스 안에는 같은 타입의 오브젝트들은 이름이 중복될 수 없다는 특징을 가지고 있다. 오브젝트들마다 별도의 UUID가 존재하긴 하지만 네임스페이스 안에서는 같은 종류의 오브젝트라면 이름 또한 UUID 같이 유일한 키 역할을 할 수가 있는 셈이다. 그리고 네임스페이스의 대표적인 특징이 타 네임스페이스에 있는 자원과 분리가 돼서 관리가 된다는 것이다. Namespace-2가 있고 그 안에는 서비스가 존재한다. 위에서 Pod와 Service 간의 연결을 Pod에는 Label을 달고 Service에는 Selector를 달아서 연결을 한다. `그런데 타 네임스페이스에 있는 Pod에는 연결이 되지 않는다.` 이뿐만 아니라 대부분의 자원들은 네임스페이스 안에서만 사용할 수가 있다. 물론 Node나 PV같이 네임스페이스에서 공용으로 사용되는 오브젝트가 존재하긴 한다. 그리고 네임스페이스를 지우게 되면 그 안에 있는 자원들도 모두 지워진다. 네임스페이스를 지울 때 유의해야 한다. 그런데 Pod마다 IP를 가지고 있는데 Namepace-2에 있는 Pod1에서 Namespace-1에 있는 Pod1에 접근을 하려면 나중에 학습할 Networking Pause라는 오브젝트를 이용해서 접근이 가능하다.
+
+yml 파일을 보면 Namespace를 만들 때 이름 외에는 특별하게 설정되는 옵션이 없다. Pod나 Service를 만들 때 내가 속한 Namespace를 지정할 수 있다. 두 오브젝트는 Namespace가 서로 다르기 때문에 Selector의 값과 Label의 값이 일치하더라도 연결되지 않는다.
+```yml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nm-1
+```
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-1
+  namespace: nm-1
+  labels:
+    nm: pod1
+spec:
+  containers:
+  ...
+```
+```yml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nm-2
+```
+```yml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-1
+  namespace: nm-2
+spec:
+  selector:
+    nm: pod1
+  ports:
+  ...
+```
+
+### ResourceQuota
+ResourceQuota는 Namespace에 자원 한계를 설정하는 오브젝트이다. Namespace에 제한하고 싶은 자원을 명시해서 아래의 yml 파일을 보면 Namespace에 들어갈 Pod들의 전체 Request 자원들을 최대 3Gi로 설정하겠다는 의미이고 memory의 limit은 6Gi로 설정하겠다는 의미이다. 한가지 중요한 것은 ResourceQuota가 지정되어 있는 Namespace에 Pod를 만들 때 Pod는 무조건 spec을 명시해야 한다. spec자체가 없으면 Namespace에 만들어지지 않는다. 그리고 현재 총 3Gi의 Request 중에 2Gi를 사용하는 Pod가 있는데 2Gi를 더 사용하는 Pod가 들어온다면 Pod가 만들어지지 않는다. yml 파일을 보면 ResourceQuota를 만들 때 할당한 Namespace를 설정하고 hard라는 속성에 제한할 종류와 자원과 그 한계치가 들어가게 된다. 메모리 뿐만 아니라 제한할 수 있는 건 CPU와 스토리지가 있다.
+
+```yml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: rq-1
+  namespace: nm-1
+spec:
+  hard:
+    requests.memory: 3Gi
+    limits.memory: 6Gi
+```
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-2
+spec:
+  containers:
+  - name: container
+    image: 
+      tmkube/app
+    resources:
+      requests:
+        memory: 2Gi
+      limits:
+        memory: 2Gi
+```
+
+### LimitRange
+LimitRange의 기능은 각각의 Pod마다 Namespace에 들어올 수 있는지 자원을 체크해준다. 체크되는 항목 중 min은 Pod에서 설정되는 메모리의 Limit 값이 1Gi가 넘어야 된다는 것이고 max는 4Gi를 초과할 수 없다는 의미이다. 그리고 maxLimitRequestRatio는 그림처럼 3을 설정하게 되면 Request 값과 limit의 비율이 최대 3배를 넘으면 안된다는 의미이다. 예시를 보면 Pad1의 경우 설정된 limit의 값이 memory가 5Gi이다. 하지만 LimitRange의 memory 값은 4Gi이기 때문에 Pod1은 들어올 수 없다. Pod2의 경우 Request와 limit의 값이 1과 4로 4배의 비율인데 3배까지만 허용된다고 되어 있기 때문에 Pod2 역시 들어올 수 없다. 추가적인 옵션으로 defaultRequest와 default라는 항목이 있는데 해당 설정을 지정해 놓으면 Pod에 자동으로 Request 값과 limit의 값이 명시된 값으로 할당이 된다.
+
+```yml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: lr-1
+  namespace: nm-1
+spec:
+  limits:
+  - type: Container
+    min:
+      memory: 1Gi
+    max:
+      memory: 4Gi
+    defaultRequest:
+      memory: 1Gi
+    default:
+      memroy: 2Gi
+    maxLimitRequestRatio:
+      memory: 3
+```
