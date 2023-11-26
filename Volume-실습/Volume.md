@@ -52,3 +52,6 @@ spec:
       path: /node-v
       type: DirectoryOrCreate
 ```
+
+## 3. PVC / PV
+
